@@ -39,7 +39,8 @@ To get the active requests it calls 'powercfg /requests' which requires administ
 - Create a new task.
 - Enter a name.
 - Select 'Run with highest privileges'.
-- Under 'Triggers' select 'At log on'.
+- Under 'Triggers' select 'At log on'. Add some 10-20 seconds of delay.
+That will allow Explorer to start first, or the icon will not appear on the taskbar.
 - Under 'Actions' select 'Start a program' and enter the executable path.
 - Put '--timeout MIN' in the 'Add arguments' field, where MIN is the minutes
 of timeout.
