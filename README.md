@@ -5,8 +5,6 @@
 A small Windows taskbar application, written in Go, for putting Windows into
 hibernate after a timeout of inactivity.
 
-## Why this exists?
-
 There are some weird bugs around Windows 11's sleep and hibernate modes
 on some setups.
 
@@ -21,11 +19,9 @@ Every few seconds the application checks if there is no user input activity.
 It also checks if there are no applications or drivers having 'requests' for the system
 to be awake. If there is no input and no requests after the timeout, hibernate is triggered.
 
-To get the active requests it calls 'powercfg /requests' which requires administrator.
+To get the active requests, it calls 'powercfg /requests' which requires administrator.
 
-## Installing
-
-### Building the executable
+## Building the executable
 
 - Install a Go compiler.
 - Install go-winres.
@@ -49,7 +45,7 @@ of timeout.
 ## Usage
 
 - Start the application as administrator.
-- To exit the application right click the taskbar icon and select 'Exit'.
+- To exit the application, right click the taskbar icon and select 'Exit'.
 - Hold your mouse over the icon to see some information like the timeout, idle time
 and requests.
 
