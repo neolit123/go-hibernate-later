@@ -36,7 +36,7 @@ var (
 	icon []byte
 )
 
-func MessageBox(title, text string) int {
+func messageBox(title, text string) int {
 	ret, _, _ := procMessageBox.Call(
 		0,
 		uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(text))),
@@ -122,7 +122,7 @@ func onReady() {
 	for {
 		hasRequests, requiresAdmin, err := hasPowerRequests()
 		if err != nil {
-			MessageBox(appName, err.Error())
+			messageBox(appName, err.Error())
 			if requiresAdmin {
 				os.Exit(1)
 			}
@@ -130,7 +130,7 @@ func onReady() {
 
 		idle, err := getIdleMilliseconds()
 		if err != nil {
-			MessageBox(appName, err.Error())
+			messageBox(appName, err.Error())
 		}
 
 		systray.SetTooltip(fmt.Sprintf("timeout: %d min, idle: %d ms, hasRequests: %v",
@@ -138,7 +138,7 @@ func onReady() {
 
 		if idle >= timeoutMilliseconds && !hasRequests {
 			if err := hibernate(); err != nil {
-				MessageBox(appName, err.Error())
+				messageBox(appName, err.Error())
 			}
 		}
 
