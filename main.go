@@ -31,6 +31,7 @@ var (
 
 	timeoutMinutes      *uint
 	timeoutMilliseconds uint32
+	startIdleRequests   uint32 = getTickCount()
 
 	//go:embed icon.ico
 	icon []byte
@@ -51,7 +52,7 @@ func getTickCount() uint32 {
 	return uint32(ret)
 }
 
-func getIdleMilliseconds() (uint32, error) {
+func getIdleInputMilliseconds() (uint32, error) {
 	type LASTINPUTINFO struct {
 		CbSize uint32
 		DwTime uint32
@@ -67,30 +68,32 @@ func getIdleMilliseconds() (uint32, error) {
 	return tickCount - lii.DwTime, nil
 }
 
-func hibernate() error {
-	ret, _, err := procSetSuspendState.Call(1, 0, 0) // bHibernate = 1
-	if ret == 0 {
-		return fmt.Errorf("error calling SetSuspendState: %v", err)
-	}
-	return nil
-}
-
-func hasPowerRequests() (bool, bool, error) {
+func getIdleRequestsMilliseconds() (uint32, bool, error) {
 	cmd := exec.Command("powercfg", "/requests")
 	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		err = fmt.Errorf("error calling 'powercfg /requests': %v\n%s", err, string(out))
 		if strings.Contains(string(out), "requires administrator") {
-			return true, true, err
+			return 0, true, err
 		}
-		return true, false, err
+		return 0, false, err
 	}
 
-	if strings.Count(string(out), "None.") == 6 {
-		return false, false, nil
+	// 6 instances of "None." means no requests. Restart the timer.
+	if strings.Count(string(out), "None.") != 6 {
+		startIdleRequests = getTickCount()
 	}
-	return true, false, nil
+
+	return getTickCount() - startIdleRequests, false, nil
+}
+
+func hibernate() error {
+	ret, _, err := procSetSuspendState.Call(1, 0, 0) // bHibernate = 1
+	if ret == 0 {
+		return fmt.Errorf("error calling SetSuspendState: %v", err)
+	}
+	return nil
 }
 
 func main() {
@@ -104,11 +107,14 @@ func main() {
 }
 
 func onReady() {
-	appName := filepath.Base(os.Args[0])
-
 	systray.SetIcon(icon)
 
-	menuItemInfo := systray.AddMenuItem(appName, "")
+	appName := filepath.Base(os.Args[0])
+
+	menuItemInfo := systray.AddMenuItem(
+		fmt.Sprintf("%s, timeout: %d min", appName, *timeoutMinutes),
+		"",
+	)
 	menuItemInfo.Disable()
 
 	systray.AddSeparator()
@@ -120,23 +126,29 @@ func onReady() {
 	}()
 
 	for {
-		hasRequests, requiresAdmin, err := hasPowerRequests()
+		idleRequestsMilliseconds, requiresAdmin, err := getIdleRequestsMilliseconds()
 		if err != nil {
 			messageBox(appName, err.Error())
 			if requiresAdmin {
-				os.Exit(1)
+				systray.Quit()
 			}
 		}
 
-		idle, err := getIdleMilliseconds()
+		idleInputMilliseconds, err := getIdleInputMilliseconds()
 		if err != nil {
 			messageBox(appName, err.Error())
 		}
 
-		systray.SetTooltip(fmt.Sprintf("timeout: %d min, idle: %d ms, hasRequests: %v",
-			*timeoutMinutes, idle, hasRequests))
+		systray.SetTooltip(fmt.Sprintf(
+			"timeout: %d ms, idleInput: %d ms, idleRequests: %d ms",
+			timeoutMilliseconds,
+			idleInputMilliseconds,
+			idleRequestsMilliseconds,
+		))
 
-		if idle >= timeoutMilliseconds && !hasRequests {
+		idleMilliseconds := min(idleInputMilliseconds, idleRequestsMilliseconds)
+
+		if idleMilliseconds >= timeoutMilliseconds {
 			if err := hibernate(); err != nil {
 				messageBox(appName, err.Error())
 			}
